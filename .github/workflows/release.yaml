@@ -9,7 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  # Build all platforms on Linux (fast)
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,4 +31,94 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+  # Sign and notarize macOS binaries
+  sign-macos:
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download macOS artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          mkdir -p dist
+          gh release download $TAG -p '*darwin*.tar.gz' -D dist/
+
+      - name: Import certificate
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          # Import certificate
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          
+          # Allow codesign to access keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+      - name: Sign and notarize
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          
+          for archive in dist/*darwin*.tar.gz; do
+            echo "Processing $archive..."
+            
+            # Extract
+            WORK_DIR=$(mktemp -d)
+            tar -xzf "$archive" -C "$WORK_DIR"
+            
+            # Sign
+            BINARY="$WORK_DIR/taskboard-mcp"
+            codesign --force --options runtime --sign "Developer ID Application: Derrick Woolworth ($APPLE_TEAM_ID)" "$BINARY"
+            
+            # Verify signature
+            codesign --verify --deep --strict "$BINARY"
+            
+            # Create zip for notarization
+            ZIP_PATH="$WORK_DIR/taskboard-mcp.zip"
+            ditto -c -k --keepParent "$BINARY" "$ZIP_PATH"
+            
+            # Submit for notarization
+            xcrun notarytool submit "$ZIP_PATH" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+            
+            # Repackage signed binary
+            BASENAME=$(basename "$archive")
+            tar -czf "dist/signed-$BASENAME" -C "$WORK_DIR" taskboard-mcp README.md LICENSE 2>/dev/null || \
+            tar -czf "dist/signed-$BASENAME" -C "$WORK_DIR" taskboard-mcp
+            
+            rm -rf "$WORK_DIR"
+          done
+
+      - name: Upload signed binaries to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          
+          for signed in dist/signed-*.tar.gz; do
+            # Replace unsigned with signed
+            ORIGINAL_NAME=$(basename "$signed" | sed 's/^signed-//')
+            mv "$signed" "dist/$ORIGINAL_NAME"
+            gh release upload $TAG "dist/$ORIGINAL_NAME" --clobber
+          done
