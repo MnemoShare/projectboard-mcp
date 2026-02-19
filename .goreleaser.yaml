@@ -51,14 +51,14 @@ release:
   draft: false
   prerelease: auto
 
-brews:
-  - name: taskboard-mcp
-    repository:
-      owner: MnemoShare
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    folder: Formula
-    homepage: "https://github.com/MnemoShare/projectboard-mcp"
-    description: "MCP server for TaskBoard - enables AI assistants to manage tasks"
-    license: "MIT"
-    skip_upload: auto
+# Homebrew tap - uncomment when MnemoShare/homebrew-tap repo exists
+# brews:
+#   - name: taskboard-mcp
+#     repository:
+#       owner: MnemoShare
+#       name: homebrew-tap
+#       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+#     folder: Formula
+#     homepage: "https://github.com/MnemoShare/projectboard-mcp"
+#     description: "MCP server for TaskBoard - enables AI assistants to manage tasks"
+#     license: "MIT"
