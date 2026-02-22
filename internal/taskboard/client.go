@@ -280,6 +280,36 @@ func (c *Client) AddComment(idOrTicket, text string) (map[string]interface{}, er
 	return result, nil
 }
 
+type CreateUserParams struct {
+	Name    string `json:"name"`
+	Email   string `json:"email"`
+	Avatar  string `json:"avatar,omitempty"`
+	IsAgent bool   `json:"isAgent,omitempty"`
+}
+
+type CreateUserResult struct {
+	ID       string `json:"_id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Avatar   string `json:"avatar"`
+	IsAgent  bool   `json:"isAgent"`
+	APIToken string `json:"apiToken,omitempty"`
+}
+
+func (c *Client) CreateUser(params CreateUserParams) (*CreateUserResult, error) {
+	data, err := c.request("POST", "/api/users", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var result CreateUserResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 func (c *Client) ListUsers() ([]User, error) {
 	data, err := c.request("GET", "/api/users", nil)
 	if err != nil {

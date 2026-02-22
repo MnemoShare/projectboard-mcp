@@ -121,6 +121,20 @@ func (s *Server) registerTools() {
 			Description: "List all team members (for task assignment)",
 			InputSchema: InputSchema{Type: "object"},
 		},
+		{
+			Name:        "create_user",
+			Description: "Create or invite a new team member (human or agent)",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"name":     {Type: "string", Description: "User's display name"},
+					"email":    {Type: "string", Description: "User's email address (must be unique)"},
+					"avatar":   {Type: "string", Description: "Emoji avatar (defaults to 🤖 for agents, 👤 for humans)"},
+					"is_agent": {Type: "boolean", Description: "Whether this user is an AI agent (agents get an API token)"},
+				},
+				Required: []string{"name", "email"},
+			},
+		},
 	}
 }
 
@@ -258,6 +272,19 @@ func (s *Server) callTool(name string, args map[string]interface{}) (interface{}
 	case "list_users":
 		return s.client.ListUsers()
 
+	case "create_user":
+		name, _ := args["name"].(string)
+		email, _ := args["email"].(string)
+		if name == "" || email == "" {
+			return nil, fmt.Errorf("name and email are required")
+		}
+		return s.client.CreateUser(taskboard.CreateUserParams{
+			Name:    name,
+			Email:   email,
+			Avatar:  getString(args, "avatar"),
+			IsAgent: getBool(args, "is_agent"),
+		})
+
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", name)
 	}
@@ -280,6 +307,11 @@ func getInt(args map[string]interface{}, key string) int {
 		return int(v)
 	}
 	return 0
+}
+
+func getBool(args map[string]interface{}, key string) bool {
+	v, _ := args[key].(bool)
+	return v
 }
 
 func getIntPtr(args map[string]interface{}, key string) *int {
