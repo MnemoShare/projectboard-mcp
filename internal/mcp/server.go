@@ -60,45 +60,45 @@ func (s *Server) registerTools() {
 		},
 		{
 			Name:        "create_task",
-			Description: "Create a new task",
+			Description: "Create a new task on a board. Requires board_id and name. The name is the short title shown on backlog and swimlane views.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
-					"board_id":    {Type: "string", Description: "Board ID"},
-					"title":       {Type: "string", Description: "Task title"},
-					"description": {Type: "string", Description: "Task description"},
-					"assignee":    {Type: "string", Description: "Assignee email"},
+					"board_id": {Type: "string", Description: "Board ID (required). Use list_boards to find the ID."},
+					"name":     {Type: "string", Description: "Short summary/title of the task (required). This is displayed as the task heading on backlog and swimlane board views. Keep it concise — one line, under 80 characters."},
+					"description": {Type: "string", Description: "Full detailed description of the task. Supports markdown. Use this for steps to reproduce, acceptance criteria, implementation details, etc."},
+					"assignee":    {Type: "string", Description: "Assignee email address. Use list_users to find valid emails."},
 					"priority": {
 						Type:        "integer",
-						Description: "Priority (1=highest, 5=lowest)",
+						Description: "Priority (1=highest, 5=lowest). Defaults to 3.",
 					},
 					"status": {
 						Type:        "string",
-						Description: "Initial status",
+						Description: "Initial status. Defaults to 'backlog'.",
 						Enum:        []string{"backlog", "todo", "in-progress", "in-qa", "completed", "rfp", "closed"},
 					},
 				},
-				Required: []string{"board_id", "title"},
+				Required: []string{"board_id", "name"},
 			},
 		},
 		{
 			Name:        "update_task",
-			Description: "Update a task",
+			Description: "Update an existing task's fields. Only provided fields are changed.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
-					"id":          {Type: "string", Description: "Task ID or ticket number"},
-					"title":       {Type: "string", Description: "New title"},
-					"description": {Type: "string", Description: "New description"},
-					"assignee":    {Type: "string", Description: "New assignee email"},
+					"id":          {Type: "string", Description: "Task ID or ticket number (e.g., MNS-42). Required."},
+					"name":        {Type: "string", Description: "New short summary/title for the task."},
+					"description": {Type: "string", Description: "New full description. Supports markdown."},
+					"assignee":    {Type: "string", Description: "New assignee email address."},
 					"status": {
 						Type:        "string",
-						Description: "New status",
+						Description: "New status.",
 						Enum:        []string{"backlog", "todo", "in-progress", "in-qa", "completed", "rfp", "closed"},
 					},
 					"priority": {
 						Type:        "integer",
-						Description: "New priority (1=highest, 5=lowest)",
+						Description: "New priority (1=highest, 5=lowest).",
 					},
 				},
 				Required: []string{"id"},
@@ -235,13 +235,13 @@ func (s *Server) callTool(name string, args map[string]interface{}) (interface{}
 
 	case "create_task":
 		boardID, _ := args["board_id"].(string)
-		title, _ := args["title"].(string)
-		if boardID == "" || title == "" {
-			return nil, fmt.Errorf("board_id and title are required")
+		name, _ := args["name"].(string)
+		if boardID == "" || name == "" {
+			return nil, fmt.Errorf("board_id and name are required")
 		}
 		return s.client.CreateTask(taskboard.CreateTaskParams{
 			BoardID:     boardID,
-			Title:       title,
+			Name:        name,
 			Description: getString(args, "description"),
 			Assignee:    getString(args, "assignee"),
 			Status:      getString(args, "status"),
@@ -254,7 +254,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (interface{}
 			return nil, fmt.Errorf("id is required")
 		}
 		return s.client.UpdateTask(id, taskboard.UpdateTaskParams{
-			Title:       getStringPtr(args, "title"),
+			Name:        getStringPtr(args, "name"),
 			Description: getStringPtr(args, "description"),
 			Assignee:    getStringPtr(args, "assignee"),
 			Status:      getStringPtr(args, "status"),

@@ -125,7 +125,7 @@ type Task struct {
 	ID           string   `json:"_id"`
 	TicketNumber string   `json:"ticketNumber"`
 	BoardID      string   `json:"boardId"`
-	Title        string   `json:"title"`
+	Name         string   `json:"name"`
 	Description  string   `json:"description"`
 	Status       string   `json:"status"`
 	Priority     int      `json:"priority"`
@@ -214,7 +214,7 @@ func (c *Client) GetTask(idOrTicket string) (*Task, error) {
 
 type CreateTaskParams struct {
 	BoardID     string `json:"boardId"`
-	Title       string `json:"title"`
+	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Assignee    string `json:"assignee,omitempty"`
 	Status      string `json:"status,omitempty"`
@@ -236,7 +236,7 @@ func (c *Client) CreateTask(params CreateTaskParams) (*Task, error) {
 }
 
 type UpdateTaskParams struct {
-	Title       *string `json:"title,omitempty"`
+	Name        *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Assignee    *string `json:"assignee,omitempty"`
 	Status      *string `json:"status,omitempty"`
