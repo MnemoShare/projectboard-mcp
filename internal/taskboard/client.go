@@ -276,7 +276,9 @@ func (c *Client) AddComment(idOrTicket, text string) (map[string]interface{}, er
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal(data, &result)
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
